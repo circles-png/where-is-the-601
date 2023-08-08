@@ -5,7 +5,7 @@ use reqwest::{
     header::{HeaderMap, ACCEPT, AUTHORIZATION},
     ClientBuilder, Method, Request,
 };
-use std::fs::write;
+use std::fs::{write, remove_dir_all, create_dir};
 
 use crate::transit_realtime::FeedMessage;
 
@@ -17,7 +17,9 @@ mod transit_realtime {
 #[tokio::main]
 async fn main() -> Result<()> {
     const ENDPOINT: &str = "https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/buses";
-    let client = ClientBuilder::new()
+    remove_dir_all("out")?;
+    create_dir("out")?;
+    let bytes = ClientBuilder::new()
         .default_headers({
             let mut header_map = HeaderMap::new();
             header_map.append(ACCEPT, "application/x-google-protobuf".parse()?);
@@ -27,11 +29,14 @@ async fn main() -> Result<()> {
             );
             header_map
         })
-        .build()?;
-    let request = Request::new(Method::GET, ENDPOINT.parse()?);
-    let response = client.execute(request).await?;
-    let bytes = response.bytes().await?;
+        .build()?
+        .execute(Request::new(Method::GET, ENDPOINT.parse()?))
+        .await?
+        .bytes()
+        .await?;
     write("out/data", bytes.clone())?;
-    println!("{:#?}", FeedMessage::decode(bytes)?);
+    let message = FeedMessage::decode(bytes)?;
+    write("out/feed_message", format!("{:#?}", message))?;
+
     Ok(())
 }
