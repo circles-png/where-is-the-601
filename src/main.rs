@@ -1,3 +1,7 @@
+#![warn(clippy::all)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
+
 use anyhow::{Ok, Result};
 use dotenvy_macro::dotenv;
 use prost::Message;
@@ -10,7 +14,9 @@ use std::fs::{write, remove_dir_all, create_dir};
 use crate::transit_realtime::FeedMessage;
 
 mod transit_realtime {
-    #![allow(non_snake_case)]
+    #![allow(clippy::all)]
+    #![allow(clippy::pedantic)]
+    #![allow(clippy::nursery)]
     include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
 }
 
