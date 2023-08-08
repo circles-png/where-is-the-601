@@ -1,10 +1,13 @@
 use anyhow::{Ok, Result};
 use dotenvy_macro::dotenv;
+use prost::Message;
 use reqwest::{
     header::{HeaderMap, ACCEPT, AUTHORIZATION},
     ClientBuilder, Method, Request,
 };
 use std::fs::write;
+
+use crate::transit_realtime::FeedMessage;
 
 mod transit_realtime {
     #![allow(non_snake_case)]
@@ -27,6 +30,8 @@ async fn main() -> Result<()> {
         .build()?;
     let request = Request::new(Method::GET, ENDPOINT.parse()?);
     let response = client.execute(request).await?;
-    write("out/data", response.bytes().await?)?;
+    let bytes = response.bytes().await?;
+    write("out/data", bytes.clone())?;
+    println!("{:#?}", FeedMessage::decode(bytes)?);
     Ok(())
 }
