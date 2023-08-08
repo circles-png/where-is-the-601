@@ -6,6 +6,11 @@ use reqwest::{
 };
 use std::fs::write;
 
+mod transit_realtime {
+    #![allow(non_snake_case)]
+    include!(concat!(env!("OUT_DIR"), "/transit_realtime.rs"));
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     const ENDPOINT: &str = "https://api.transport.nsw.gov.au/v1/gtfs/vehiclepos/buses";
@@ -22,6 +27,6 @@ async fn main() -> Result<()> {
         .build()?;
     let request = Request::new(Method::GET, ENDPOINT.parse()?);
     let response = client.execute(request).await?;
-    write("out/data.proto", response.bytes().await?)?;
+    write("out/data", response.bytes().await?)?;
     Ok(())
 }
