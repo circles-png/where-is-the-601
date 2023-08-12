@@ -13,6 +13,8 @@ dotenvy_macro = "0.15.7"
 reqwest = "0.11.18"
 bytes = "1.4.0"
 prost = "0.11.9"
+termcolor_output = "1.0.1"
+termcolor = "1.2.0"
 
 [build-dependencies]
 prost-build = "0.11.9"
