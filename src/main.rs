@@ -17,7 +17,10 @@ use std::{
 };
 use transit_realtime::FeedEntity;
 
-use crate::transit_realtime::{vehicle_position::CongestionLevel, FeedMessage};
+use crate::transit_realtime::{
+    vehicle_position::{CongestionLevel, OccupancyStatus},
+    FeedMessage,
+};
 
 mod transit_realtime {
     #![allow(clippy::all, clippy::pedantic, clippy::nursery, non_snake_case)]
@@ -76,16 +79,90 @@ fn clear_output_directory() -> Result<()> {
     Ok(())
 }
 
+fn get_start(entity: &FeedEntity) -> Result<(String, String)> {
+    Ok((
+        {
+            let date = entity
+                .vehicle
+                .as_ref()
+                .unwrap()
+                .trip
+                .as_ref()
+                .unwrap()
+                .start_date();
+            format!("{}/{}/{}", &date[6..], &date[4..6], &date[..4])
+        },
+        {
+            let time = entity
+                .vehicle
+                .as_ref()
+                .unwrap()
+                .trip
+                .as_ref()
+                .unwrap()
+                .start_time();
+            let time = NaiveTime::from_hms_opt(
+                time[..2].parse()?,
+                time[3..5].parse()?,
+                time[6..].parse()?,
+            )
+            .unwrap();
+            time.format("%-I:%M %p").to_string()
+        },
+    ))
+}
+
+fn get_location_data(entity: &FeedEntity) -> Result<String> {
+    {
+        let position = entity.vehicle.as_ref().unwrap().position.as_ref().unwrap();
+        Ok(format!(
+            "{}         ({}, {})
+    {}          {}˚ {}{}{}
+    {}            {} {}",
+            "position".dimmed(),
+            position.latitude,
+            position.longitude,
+            "heading".dimmed(),
+            position.bearing.unwrap(),
+            "(".dimmed(),
+            if position.bearing.unwrap() < 22.5 {
+                "N".bold()
+            } else if position.bearing.unwrap() < 67.5 {
+                "NE".bold()
+            } else if position.bearing.unwrap() < 112.5 {
+                "E".bold()
+            } else if position.bearing.unwrap() < 157.5 {
+                "SE".bold()
+            } else if position.bearing.unwrap() < 202.5 {
+                "S".bold()
+            } else if position.bearing.unwrap() < 247.5 {
+                "SW".bold()
+            } else if position.bearing.unwrap() < 292.5 {
+                "W".bold()
+            } else if position.bearing.unwrap() < 337.5 {
+                "NW".bold()
+            } else {
+                "N".bold()
+            },
+            ")".dimmed(),
+            "speed".dimmed(),
+            position.speed.unwrap(),
+            "km/h".dimmed()
+        ))
+    }
+}
+
 fn print_entities(entities: &Vec<&FeedEntity>) -> Result<()> {
     for entity in entities {
         println!(
             "{} {}
-    {} {}
-    {} {} {} {}
+    {}               {}
+    {}            {} {} {}
     {}
     {} {}
+    {} {}
 ",
-            "Found route".dimmed(),
+            "Found route".bright_green(),
             entity
                 .vehicle
                 .as_ref()
@@ -98,72 +175,10 @@ fn print_entities(entities: &Vec<&FeedEntity>) -> Result<()> {
             "ID".dimmed(),
             entity.id,
             "start".dimmed(),
-            {
-                let date = entity
-                    .vehicle
-                    .as_ref()
-                    .unwrap()
-                    .trip
-                    .as_ref()
-                    .unwrap()
-                    .start_date();
-                format!("{}/{}/{}", &date[6..], &date[4..6], &date[..4])
-            },
+            get_start(entity)?.0,
             "at".dimmed(),
-            {
-                let time = entity
-                    .vehicle
-                    .as_ref()
-                    .unwrap()
-                    .trip
-                    .as_ref()
-                    .unwrap()
-                    .start_time();
-                let time = NaiveTime::from_hms_opt(
-                    time[..2].parse()?,
-                    time[3..5].parse()?,
-                    time[6..].parse()?,
-                )
-                .unwrap();
-                time.format("%-I:%M %p")
-            },
-            {
-                let position = entity.vehicle.as_ref().unwrap().position.as_ref().unwrap();
-                format!(
-                    "{} ({}, {})
-    {} {}˚ {}{}{}
-    {} {} {}",
-                    "position".dimmed(),
-                    position.latitude,
-                    position.longitude,
-                    "heading".dimmed(),
-                    position.bearing.unwrap(),
-                    "(".dimmed(),
-                    if position.bearing.unwrap() < 22.5 {
-                        "N".bold()
-                    } else if position.bearing.unwrap() < 67.5 {
-                        "NE".bold()
-                    } else if position.bearing.unwrap() < 112.5 {
-                        "E".bold()
-                    } else if position.bearing.unwrap() < 157.5 {
-                        "SE".bold()
-                    } else if position.bearing.unwrap() < 202.5 {
-                        "S".bold()
-                    } else if position.bearing.unwrap() < 247.5 {
-                        "SW".bold()
-                    } else if position.bearing.unwrap() < 292.5 {
-                        "W".bold()
-                    } else if position.bearing.unwrap() < 337.5 {
-                        "NW".bold()
-                    } else {
-                        "N".bold()
-                    },
-                    ")".dimmed(),
-                    "speed".dimmed(),
-                    position.speed.unwrap(),
-                    "km/h".dimmed()
-                )
-            },
+            get_start(entity)?.1,
+            get_location_data(entity)?,
             "congestion level".dimmed(),
             CongestionLevel::from_i32(entity.vehicle.as_ref().unwrap().congestion_level.unwrap())
                 .unwrap()
@@ -172,6 +187,22 @@ fn print_entities(entities: &Vec<&FeedEntity>) -> Result<()> {
                 .map(str::to_lowercase)
                 .collect::<Vec<_>>()
                 .join(" "),
+            "occupancy status".dimmed(),
+            OccupancyStatus::from_i32(
+                *entity
+                    .vehicle
+                    .as_ref()
+                    .unwrap()
+                    .occupancy_status
+                    .as_ref()
+                    .unwrap()
+            )
+            .unwrap()
+            .as_str_name()
+            .split('_')
+            .map(str::to_lowercase)
+            .collect::<Vec<_>>()
+            .join(" "),
         );
     }
     Ok(())
